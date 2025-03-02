@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Air Quality Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map { height: 100vh; }
+    .custom-marker {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        text-align: center;
+        border-radius: 50%;
+        width: 100px;
+        height: 100px;
+        font-size: 20px;
+    }
+    @media (max-width: 768px) { /* For screens smaller than 768px */
+        .custom-marker {
+            width: 70px; /* Smaller marker size */
+            height: 70px;
+            font-size: 16px; /* Slightly smaller text */
+        }
+    }
+    .good {
+        background-color: rgba(0, 128, 0, 0.3); /* Semi-transparent green */
+    }
+
+    .moderate {
+        background-color: rgba(255, 165, 0, 0.7); /* Semi-transparent orange */
+    }
+    
+    .unhealthy {
+        background-color: rgba(255, 0, 0, 1); /* Fully opaque red */
+    }
+    .nodata {
+        background-color: rgba(20, 20, 20, 0.2); /* Fully opaque red */
+    }
+
+    /* Style for the server status indicator */
+    #server-status {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        padding: 10px;
+        border-radius: 5px;
+        font-size: 14px;
+        color: white;
+        background-color: gray; /* Default color */
+        z-index: 1000; /* Ensure it stays above the map */
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="server-status">Checking server status...</div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    // Ensure the map resizes properly on mobile devices
+    window.addEventListener('resize', () => {
+        map.invalidateSize();
+    });
+
+    // Initialize the map and set its view to Rayong, Thailand
+    const map = L.map('map').setView([12.6824, 101.2694598], 12
+
+
+    ); // Centered on Rayong
+
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Server status element
+    const serverStatusElement = document.getElementById('server-status');
+    const statusUrl = 'http://localhost:3000/status'; // Local server's status endpoint
+    const API_URL = "http://localhost:3000/data"; // Local server's data endpoint
+
+    // Check server status
+    async function checkServerStatus() {
+      try {
+        const response = await fetch(statusUrl);
+        if (response.ok) {
+          const data = await response.json();
+          console.log(data+"AA")
+          if (data.status === 'online') {
+            serverStatusElement.textContent = 'Server Status: Online';
+            serverStatusElement.style.backgroundColor = 'green';
+          } else {
+            throw new Error('Server offline');
+          }
+        } else {
+          throw new Error('Failed to fetch status');
+        }
+      } catch (error) {
+        serverStatusElement.textContent = 'Server Status: Offline';
+        serverStatusElement.style.backgroundColor = 'red';
+      }
+    }
+
+    // Check server status every 10 seconds
+    checkServerStatus();
+    setInterval(checkServerStatus, 10000);
+
+    async function fetchAirQualityData() {
+      const response = await fetch(API_URL);
+      const data = await response.json();
+      return data;
+    }
+    let markers = [];
+
+    async function updateMarkers() {
+      // Fetch air quality data from the server
+      const airQualityData = await fetchAirQualityData();
+
+      // Remove all existing markers
+      markers.forEach(marker => map.removeLayer(marker));
+      markers = []; // Clear the markers array
+
+      // Add new markers
+      airQualityData.forEach(station => {
+        const colorClass = getMarkerColor(station.pm25);
+
+        const customIcon = L.divIcon({
+          className: `custom-marker ${colorClass}`,
+          html: `<div>${station.pm25}</div>`,
+          iconSize: [50, 50],
+          iconAnchor: [25, 25],
+        });
+
+        const marker = L.marker([station.lat, station.lon+0.001], { icon: customIcon }).addTo(map);
+
+        const popupContent = `
+          <b>${station.station}</b><br>
+          Status: ${getMarkerColor(station.pm25)}
+          PM2.5: ${station.pm25} µg/m³<br>
+          Temperature: ${station.temperature} °C<br>
+          Humidity: ${station.humidity} %<br>
+        `;
+
+        marker.bindPopup(popupContent);
+
+        // Add the marker to the markers array
+        markers.push(marker);
+      });
+    }
+
+    // Initial load
+    updateMarkers();
+
+    // Auto-update every 10 seconds
+    setInterval(updateMarkers, 5000);
+
+    // Function to determine marker color based on air quality
+    function getMarkerColor(pm25) {
+      if (pm25 == null) return "nodata"
+      if (pm25 <= 10) return "good";
+      if (pm25 <= 35) return "moderate";
+      if (pm25 > 35) return "unhealthy"; 
+      
+    }
+  </script>
+</body>
+</html>
