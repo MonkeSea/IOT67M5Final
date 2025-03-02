@@ -9,7 +9,7 @@ npm install cors
 
 กด Add .Zip ทั้ง 2 Lib
 
-##Start Up Method
+## Start Up Method
 1. node server.js เพื่อ Host
 2. แก้รหัส wifi และ ssid ให้เป็นของตัวเอง (ใน IDE)
 3. แก้ Ip:port ให้เป็นของเครื่องที่ Host ใช้ IPV4 (ใน IDE)
